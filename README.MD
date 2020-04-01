@@ -23,7 +23,7 @@ $ nomad agent -dev
 # 3. Start Traefik as Proxy/Ingress (in another shell)
 $ ./jobs/ingress/start-ingress.sh
 
-# 4. Start demo API (Read README.MD at docker/web to understand)
+# 4. Start demo API (Read README.MD at docker/web for more information)
 $ ./docker/web/deployment/start.sh
 
 
