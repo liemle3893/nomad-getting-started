@@ -1,0 +1,76 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+consul_version = "1.7.2"
+
+consul_unit = <<~SHELL
+  [Service]
+  ExecStart=/usr/bin/consul agent -dev -client=0.0.0.0
+  [Install]
+  WantedBy=multi-user.target
+SHELL
+
+
+consul = <<~SHELL
+  yum install -y unzip
+  curl https://releases.hashicorp.com/consul/#{consul_version}/consul_#{consul_version}_linux_amd64.zip > consul.zip
+  unzip -d . consul.zip
+  chmod +x consul
+  mv consul /usr/bin/consul
+  rm consul.zip
+  useradd -d /var/lib/consul consul
+  usermod -a -G consul vagrant
+  mkhomedir_helper consul
+  chmod g+rw /var/lib/consul
+  mkdir -p /etc/consul /var/consul
+  mkdir -p /usr/lib/systemd/system
+  echo '#{consul_unit}' > /usr/lib/systemd/system/consul.service
+  systemctl daemon-reload
+  systemctl unmask consul
+  systemctl enable consul
+SHELL
+
+VAGRANTFILE_API_VERSION = "2"
+
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+  config.vm.box = "bento/centos-7.7"
+  # Hardening box version
+  config.vm.box_version = "202002.04.0"
+
+  config.ssh.insert_key = true
+  # create management node. This node will run
+  config.vm.define :mgmt do |mgmt_config|
+    mgmt_config.vm.hostname = "management"
+    mgmt_config.vm.network :private_network, ip: "38.19.93.10"
+    mgmt_config.vm.provider "virtualbox" do |vb|
+      vb.memory = "512"
+    end
+    mgmt_config.vm.provision :shell, path: "provisioning/shell/boostrap-management-node.sh"
+    mgmt_config.vm.provision :shell, :inline => consul
+    mgmt_config.vm.provision :shell, :inline => "systemctl start consul"
+  end
+
+
+  # Create Servers
+  (1..1).each do |i|
+    config.vm.define "server#{i}" do |server_config|
+      server_config.vm.hostname = "server#{i}"
+      server_config.vm.network :private_network, ip: "38.19.93.#{10 + i}"
+      server_config.vm.provider "virtualbox" do |vb|
+        vb.memory = "256"
+      end
+    end
+  end
+
+  # Create Consul/Nomad agent node.
+  (1..1).each do |i|
+    config.vm.define "agent#{i}" do |agent_config|
+      agent_config.vm.hostname = "agent#{i}"
+      agent_config.vm.network :private_network, ip: "38.19.93.#{ 20 + i}"
+      agent_config.vm.provider "virtualbox" do |vb|
+          vb.memory = "256"
+      end
+    end
+  end
+
+  config.vm.provision :shell, :inline => "sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config && systemctl reload sshd"
+end

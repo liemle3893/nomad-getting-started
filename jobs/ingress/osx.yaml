@@ -1,0 +1,5 @@
+---
+ingress:
+  traefik:
+    traefik:
+      consul_addr: "docker.for.mac.host.internal:8500"

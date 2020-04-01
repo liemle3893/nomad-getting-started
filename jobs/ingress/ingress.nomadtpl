@@ -1,0 +1,96 @@
+job "ingress" {
+  datacenters = ["dc1"]
+  type        = "system"
+
+  group "traefik" {
+    update {
+      max_parallel      = 1
+      min_healthy_time  = "10s"
+      progress_deadline = "10m"
+      healthy_deadline  = "5m"
+    }
+    task "traefik" {
+      driver = "docker"
+      config {
+        image = "traefik:2.2"
+        volumes = [
+          "local/traefik.toml:/etc/traefik/traefik.toml",
+        ]
+        sysctl = {
+          "net.core.somaxconn" = "65535"
+        }
+        ulimit {
+          nofile = "65536"
+          nproc  = "8192"
+        }
+      }
+
+      logs {
+        max_files     = 10
+        max_file_size = 10
+      }
+      template {
+        data        = <<EOF
+        GOMAXPROCS={{ env "attr.cpu.numcores" }}
+        EOF
+        env         = true
+        destination = "local/env"
+      }
+      template {
+        data = <<EOF
+[accessLog]
+format = "json"
+[serversTransport]
+  insecureSkipVerify = true
+[entryPoints]
+    [entryPoints.http]
+    address = ":38930"
+    [entryPoints.traefik]
+    address = ":38931"
+[api]
+    dashboard = true
+		insecure = true
+
+[ping]
+entryPoint = "traefik"
+
+[providers.consulCatalog]
+  exposedByDefault = false
+  [providers.consulCatalog.endpoint]
+    address = "http://[[ .ingress.traefik.traefik.consul_addr ]]"
+EOF
+
+        destination = "local/traefik.toml"
+      }
+
+      resources {
+        cpu    = 300
+        memory = 500
+
+        network {
+          mbits = 1
+          port "http" {
+            static = "38930"
+          }
+          port "api" {
+            static = "38931"
+          }
+        }
+      }
+
+      service {
+        name = "traefik"
+        check {
+          name     = "alive"
+          type     = "http"
+          port     = "api"
+          path     = "/ping"
+          interval = "10s"
+          timeout  = "1s"
+        }
+      }
+    }
+  }
+}
+
+

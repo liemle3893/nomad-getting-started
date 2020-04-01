@@ -1,0 +1,11 @@
+---
+demo:
+  api:
+    count: 1
+    demo_api:
+      image: "saboteurkid/go-demo:latest-debug"
+      service:
+        address_mode: auto
+      resouces:
+        cpu: 20
+        memory: 20

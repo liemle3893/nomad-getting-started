@@ -1,0 +1,21 @@
+- hosts: nomad_agents
+  tasks:
+    - name: Get CPU info
+      tags:
+        - cpu
+      shell: cat /proc/cpuinfo |  grep "cpu MHz" | awk -F ':' '{print $2}'
+      register: cpuinfo
+    - name: Calculate CPUs speed
+      tags:
+        - cpu
+      set_fact: total_cpu_mhz="{{ cpuinfo.stdout.split('\n') | map('trim') | map('int') | sum(start=0) }}"
+
+- hosts: 
+  - nomad_instances
+  gather_facts: Yes
+  become: Yes
+  roles:
+    - { role: brianshumate.nomad }
+  tasks:
+    - name: Start Nomad
+      service: name=nomad state=started enabled=yes
