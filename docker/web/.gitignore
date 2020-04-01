@@ -3,3 +3,5 @@
 !*.*
 # Unignore all dirs
 !*/
+!Makefile
+!Dockerfile
